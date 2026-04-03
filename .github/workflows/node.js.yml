@@ -32,10 +32,10 @@ jobs:
       - name: Set up environment variables
         run: |
           echo "PORT=${{ env.PORT }}" >> .env
-          echo "MONGODB_CONNECTION_STRING=${{ env.MONGODB_URI }}" >> .env    
+          echo "MONGODB_URI=${{ env.MONGODB_URI }}" >> .env    
           echo "AWS_ACCESS_KEY_ID=${{ env.AWS_ACCESS_KEY_ID }}" >> .env
           echo "CORS_ORIGIN=${{ env.CORS_ORIGIN }}" >> .env
-          
+
       - name: Verify Environment Variables
         run: node verify-env.js
         
