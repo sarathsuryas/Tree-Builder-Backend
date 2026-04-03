@@ -1,98 +1,370 @@
-<p align="center">
-  <a href="http://nestjs.com/" target="blank"><img src="https://nestjs.com/img/logo-small.svg" width="120" alt="Nest Logo" /></a>
-</p>
+# Recursive Node Tree Builder Backend
 
-[circleci-image]: https://img.shields.io/circleci/build/github/nestjs/nest/master?token=abc123def456
-[circleci-url]: https://circleci.com/gh/nestjs/nest
+NestJS backend for managing an infinitely recursive node tree using MongoDB, Mongoose, and TypeScript.
 
-  <p align="center">A progressive <a href="http://nodejs.org" target="_blank">Node.js</a> framework for building efficient and scalable server-side applications.</p>
-    <p align="center">
-<a href="https://www.npmjs.com/~nestjscore" target="_blank"><img src="https://img.shields.io/npm/v/@nestjs/core.svg" alt="NPM Version" /></a>
-<a href="https://www.npmjs.com/~nestjscore" target="_blank"><img src="https://img.shields.io/npm/l/@nestjs/core.svg" alt="Package License" /></a>
-<a href="https://www.npmjs.com/~nestjscore" target="_blank"><img src="https://img.shields.io/npm/dm/@nestjs/common.svg" alt="NPM Downloads" /></a>
-<a href="https://circleci.com/gh/nestjs/nest" target="_blank"><img src="https://img.shields.io/circleci/build/github/nestjs/nest/master" alt="CircleCI" /></a>
-<a href="https://discord.gg/G7Qnnhy" target="_blank"><img src="https://img.shields.io/badge/discord-online-brightgreen.svg" alt="Discord"/></a>
-<a href="https://opencollective.com/nest#backer" target="_blank"><img src="https://opencollective.com/nest/backers/badge.svg" alt="Backers on Open Collective" /></a>
-<a href="https://opencollective.com/nest#sponsor" target="_blank"><img src="https://opencollective.com/nest/sponsors/badge.svg" alt="Sponsors on Open Collective" /></a>
-  <a href="https://paypal.me/kamilmysliwiec" target="_blank"><img src="https://img.shields.io/badge/Donate-PayPal-ff3f59.svg" alt="Donate us"/></a>
-    <a href="https://opencollective.com/nest#sponsor"  target="_blank"><img src="https://img.shields.io/badge/Support%20us-Open%20Collective-41B883.svg" alt="Support us"></a>
-  <a href="https://twitter.com/nestframework" target="_blank"><img src="https://img.shields.io/twitter/follow/nestframework.svg?style=social&label=Follow" alt="Follow us on Twitter"></a>
-</p>
-  <!--[![Backers on Open Collective](https://opencollective.com/nest/backers/badge.svg)](https://opencollective.com/nest#backer)
-  [![Sponsors on Open Collective](https://opencollective.com/nest/sponsors/badge.svg)](https://opencollective.com/nest#sponsor)-->
+This project follows clean architecture principles with:
 
-## Description
+- Feature-based modules
+- Repository pattern with a shared base repository
+- Dependency inversion through interfaces and injection tokens
+- DTO validation using `class-validator` and `class-transformer`
+- Materialized-path storage for efficient subtree reads and deletes
 
-[Nest](https://github.com/nestjs/nest) framework TypeScript starter repository.
+## Tech Stack
 
-## Project setup
+- NestJS
+- TypeScript
+- MongoDB
+- Mongoose
+- ESLint + Prettier
 
-```bash
-$ npm install
+## Features
+
+- Create a root or child node
+- Fetch the full tree in nested form
+- Delete a node and its entire subtree
+- Validate request payloads centrally
+- Enable configurable CORS in application bootstrap
+
+## Architecture Overview
+
+The codebase is organized by responsibility so business logic stays isolated from framework and database details.
+
+```text
+src/
+  app.controller.ts
+  app.module.ts
+  main.ts
+  common/
+    constants/
+      injection-tokens.ts
+    persistence/
+      base.repository.ts
+      interfaces/
+        base-repository.interface.ts
+  nodes/
+    application/
+      dto/
+        create-node.dto.ts
+        delete-node.dto.ts
+      interfaces/
+        node.repository.interface.ts
+        node.service.interface.ts
+        node-tree.interface.ts
+      services/
+        node.service.ts
+    domain/
+      entities/
+        node.entity.ts
+    infrastructure/
+      persistence/
+        repositories/
+          node.repository.ts
+        schemas/
+          node.schema.ts
+    presentation/
+      nodes.controller.ts
+    nodes.module.ts
 ```
 
-## Compile and run the project
+### Layer Responsibilities
+
+- `presentation`: HTTP controllers and route handling
+- `application`: use cases, DTOs, and service/repository contracts
+- `domain`: core entity definitions
+- `infrastructure`: Mongoose schema and repository implementations
+- `common`: shared abstractions and tokens used across modules
+
+## Tree Model
+
+Each node contains:
+
+- `name: string`
+- `parentId: ObjectId | null`
+- `path: string`
+- `depth: number`
+- `createdAt: Date`
+- `updatedAt: Date`
+
+### Why `path` is used
+
+The application uses a materialized-path strategy. A node path looks like:
+
+```text
+/680d7cb2f6f2c4b715dcb001/680d7d01f6f2c4b715dcb002/
+```
+
+This makes subtree operations efficient:
+
+- Read all descendants using a path-prefix query
+- Delete an entire subtree with one `deleteMany` operation
+- Avoid recursive database traversal for delete operations
+
+## Dependency Inversion
+
+The project uses interfaces plus provider tokens so upper layers do not depend on concrete implementations.
+
+### Repository abstraction
+
+- `INodeRepository` defines the contract used by the service
+- `NodeRepository` implements the MongoDB/Mongoose behavior
+- `NODE_REPOSITORY` is the injection token used in the module
+
+### Service abstraction
+
+- `INodeService` defines the contract used by the controller
+- `NodeService` contains the business logic
+- `NODE_SERVICE` is the injection token used in the module
+
+## API Endpoints
+
+Base URL:
+
+```text
+/api/v1
+```
+
+### Health Check
+
+`GET /api/v1`
+
+Response:
+
+```json
+{
+  "status": "ok",
+  "service": "recursive-node-tree-builder"
+}
+```
+
+### Create Node
+
+`POST /api/v1/nodes`
+
+Request body:
+
+```json
+{
+  "name": "Engineering",
+  "parentId": "680d7cb2f6f2c4b715dcb001"
+}
+```
+
+`parentId` is optional. Omit it or send `null` to create a root node.
+
+Response example:
+
+```json
+{
+  "id": "680d7d01f6f2c4b715dcb002",
+  "name": "Engineering",
+  "parentId": "680d7cb2f6f2c4b715dcb001",
+  "path": "/680d7cb2f6f2c4b715dcb001/680d7d01f6f2c4b715dcb002/",
+  "depth": 1,
+  "createdAt": "2026-04-03T06:20:00.000Z",
+  "updatedAt": "2026-04-03T06:20:00.000Z"
+}
+```
+
+### Get Full Tree
+
+`GET /api/v1/nodes`
+
+Response example:
+
+```json
+[
+  {
+    "id": "680d7cb2f6f2c4b715dcb001",
+    "name": "Root",
+    "parentId": null,
+    "path": "/680d7cb2f6f2c4b715dcb001/",
+    "depth": 0,
+    "createdAt": "2026-04-03T06:10:00.000Z",
+    "updatedAt": "2026-04-03T06:10:00.000Z",
+    "children": [
+      {
+        "id": "680d7d01f6f2c4b715dcb002",
+        "name": "Engineering",
+        "parentId": "680d7cb2f6f2c4b715dcb001",
+        "path": "/680d7cb2f6f2c4b715dcb001/680d7d01f6f2c4b715dcb002/",
+        "depth": 1,
+        "createdAt": "2026-04-03T06:20:00.000Z",
+        "updatedAt": "2026-04-03T06:20:00.000Z",
+        "children": []
+      }
+    ]
+  }
+]
+```
+
+The service builds this structure in `O(n)` time using a map keyed by node id.
+
+### Delete Node
+
+`DELETE /api/v1/nodes/:id`
+
+Example:
+
+```text
+DELETE /api/v1/nodes/680d7d01f6f2c4b715dcb002
+```
+
+Response:
+
+```json
+{
+  "deletedCount": 3
+}
+```
+
+The count includes the selected node and all descendants.
+
+## Validation Rules
+
+### Create node DTO
+
+- `name` is required
+- `name` is trimmed
+- `name` length must be between 1 and 120 characters
+- `parentId` is optional
+- `parentId` must be a valid Mongo ObjectId if provided
+
+### Delete node DTO
+
+- `id` must be a valid Mongo ObjectId
+
+Global validation is enabled in bootstrap with:
+
+- `whitelist: true`
+- `transform: true`
+- `forbidNonWhitelisted: true`
+
+## CORS
+
+CORS is enabled in [src/main.ts](./src/main.ts).
+
+Configuration behavior:
+
+- If `CORS_ORIGIN` is set, it is treated as a comma-separated allowlist
+- If `CORS_ORIGIN` is not set, all origins are allowed
+- Credentials are enabled
+- Allowed methods: `GET`, `POST`, `DELETE`, `OPTIONS`
+
+## Environment Variables
+
+Create a `.env` file in the project root.
+
+```env
+PORT=3000
+MONGODB_URI=mongodb://127.0.0.1:27017/tree-builder
+CORS_ORIGIN=http://localhost:5001,http://localhost:5173
+```
+
+## Installation
+
+```bash
+npm install
+```
+
+## Running the Project
 
 ```bash
 # development
-$ npm run start
+npm run start:dev
 
-# watch mode
-$ npm run start:dev
+# production build
+npm run build
 
-# production mode
-$ npm run start:prod
+# run compiled app
+npm run start:prod
 ```
 
-## Run tests
+The server starts on:
+
+```text
+http://localhost:5001/api/v1
+```
+
+## Linting
 
 ```bash
-# unit tests
-$ npm run test
-
-# e2e tests
-$ npm run test:e2e
-
-# test coverage
-$ npm run test:cov
+npm run lint
 ```
 
-## Deployment
+## Important Implementation Notes
 
-When you're ready to deploy your NestJS application to production, there are some key steps you can take to ensure it runs as efficiently as possible. Check out the [deployment documentation](https://docs.nestjs.com/deployment) for more information.
+### Base repository
 
-If you are looking for a cloud-based platform to deploy your NestJS application, check out [Mau](https://mau.nestjs.com), our official platform for deploying NestJS applications on AWS. Mau makes deployment straightforward and fast, requiring just a few simple steps:
+The shared base repository centralizes common persistence behavior:
 
-```bash
-$ npm install -g @nestjs/mau
-$ mau deploy
+- `create`
+- `findById`
+- `findAll`
+- `deleteMany`
+
+This keeps feature repositories focused on feature-specific query behavior instead of duplicating CRUD code.
+
+### Node repository
+
+`NodeRepository` extends the base repository and adds subtree-specific operations:
+
+- `findByPathPrefix`
+- `deleteSubtreeByPath`
+
+### Node service
+
+`NodeService` is responsible for:
+
+- validating parent existence before creating a child node
+- computing `path` and `depth`
+- transforming flat node records into a nested tree
+- deleting a subtree using the stored materialized path
+
+## Example Flow
+
+### Create root node
+
+```json
+{
+  "name": "Root"
+}
 ```
 
-With Mau, you can deploy your application in just a few clicks, allowing you to focus on building features rather than managing infrastructure.
+Generated values:
 
-## Resources
+- `parentId = null`
+- `depth = 0`
+- `path = /<nodeId>/`
 
-Check out a few resources that may come in handy when working with NestJS:
+### Create child node
 
-- Visit the [NestJS Documentation](https://docs.nestjs.com) to learn more about the framework.
-- For questions and support, please visit our [Discord channel](https://discord.gg/G7Qnnhy).
-- To dive deeper and get more hands-on experience, check out our official video [courses](https://courses.nestjs.com/).
-- Deploy your application to AWS with the help of [NestJS Mau](https://mau.nestjs.com) in just a few clicks.
-- Visualize your application graph and interact with the NestJS application in real-time using [NestJS Devtools](https://devtools.nestjs.com).
-- Need help with your project (part-time to full-time)? Check out our official [enterprise support](https://enterprise.nestjs.com).
-- To stay in the loop and get updates, follow us on [X](https://x.com/nestframework) and [LinkedIn](https://linkedin.com/company/nestjs).
-- Looking for a job, or have a job to offer? Check out our official [Jobs board](https://jobs.nestjs.com).
+```json
+{
+  "name": "Team A",
+  "parentId": "<rootId>"
+}
+```
 
-## Support
+Generated values:
 
-Nest is an MIT-licensed open source project. It can grow thanks to the sponsors and support by the amazing backers. If you'd like to join them, please [read more here](https://docs.nestjs.com/support).
+- `depth = parent.depth + 1`
+- `path = parent.path + <nodeId>/`
 
-## Stay in touch
+## Current Notes
 
-- Author - [Kamil Myśliwiec](https://twitter.com/kammysliwiec)
-- Website - [https://nestjs.com](https://nestjs.com/)
-- Twitter - [@nestframework](https://twitter.com/nestframework)
+- The repository and service layers are both abstracted through interfaces and provider tokens
+- The current codebase does not include active test files
+- The `package.json` still contains Jest-related scripts, so update or remove them if you do not plan to restore tests later
+
+## Future Improvements
+
+- Add Swagger/OpenAPI documentation
+- Add pagination or filtered subtree queries
+- Add transactions if future write workflows span multiple collections
+- Add role-based authorization if the API becomes multi-user
+- Add audit logging for node mutations
 
 ## License
 
-Nest is [MIT licensed](https://github.com/nestjs/nest/blob/master/LICENSE).
+UNLICENSED
