@@ -7,11 +7,12 @@ import type {
   CreateNodeRepositoryInput,
   INodeRepository,
 } from '../interfaces/node.repository.interface';
+import type { INodeService } from '../interfaces/node.service.interface';
 import type { TreeNode } from '../interfaces/node-tree.interface';
 import type { NodeEntity } from '../../domain/entities/node.entity';
 
 @Injectable()
-export class NodeService {
+export class NodeService implements INodeService {
   constructor(
     @Inject(NODE_REPOSITORY)
     private readonly nodeRepository: INodeRepository,
@@ -51,7 +52,7 @@ export class NodeService {
     deleteNodeDto: DeleteNodeDto,
   ): Promise<{ deletedCount: number }> {
     const targetNode = await this.nodeRepository.findById(deleteNodeDto.id);
-    console.log('Target node for deletion:', targetNode); // Debug log to verify node retrieval
+
     if (!targetNode) {
       throw new NotFoundException(`Node "${deleteNodeDto.id}" was not found.`);
     }

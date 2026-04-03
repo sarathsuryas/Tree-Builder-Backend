@@ -1,6 +1,9 @@
 import { Module } from '@nestjs/common';
 import { MongooseModule } from '@nestjs/mongoose';
-import { NODE_REPOSITORY } from '../common/constants/injection-tokens';
+import {
+  NODE_REPOSITORY,
+  NODE_SERVICE,
+} from '../common/constants/injection-tokens';
 import { NodeService } from './application/services/node.service';
 import { NodeRepository } from './infrastructure/persistence/repositories/node.repository';
 import {
@@ -26,7 +29,11 @@ import { NodesController } from './presentation/nodes.controller';
       provide: NODE_REPOSITORY,
       useExisting: NodeRepository,
     },
+    {
+      provide: NODE_SERVICE,
+      useExisting: NodeService,
+    },
   ],
-  exports: [NODE_REPOSITORY],
+  exports: [NODE_REPOSITORY, NODE_SERVICE],
 })
 export class NodesModule {}

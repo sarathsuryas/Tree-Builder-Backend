@@ -1,11 +1,23 @@
-import { Body, Controller, Delete, Get, Param, Post } from '@nestjs/common';
+import {
+  Body,
+  Controller,
+  Delete,
+  Get,
+  Inject,
+  Param,
+  Post,
+} from '@nestjs/common';
+import { NODE_SERVICE } from '../../common/constants/injection-tokens';
 import { CreateNodeDto } from '../application/dto/create-node.dto';
 import { DeleteNodeDto } from '../application/dto/delete-node.dto';
-import { NodeService } from '../application/services/node.service';
+import type { INodeService } from '../application/interfaces/node.service.interface';
 
 @Controller('nodes')
 export class NodesController {
-  constructor(private readonly nodeService: NodeService) {}
+  constructor(
+    @Inject(NODE_SERVICE)
+    private readonly nodeService: INodeService,
+  ) {}
 
   @Post()
   create(@Body() createNodeDto: CreateNodeDto) {

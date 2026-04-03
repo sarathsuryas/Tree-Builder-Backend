@@ -1,6 +1,6 @@
 import { Injectable } from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
-import { Document, FilterQuery, Model, Types } from 'mongoose';
+import { FilterQuery, Model } from 'mongoose';
 import { BaseRepository } from '../../../../common/persistence/base.repository';
 import {
   CreateNodeRepositoryInput,
@@ -38,7 +38,6 @@ export class NodeRepository
   }
 
   async deleteSubtreeByPath(path: string): Promise<number> {
-    console.log(`repo Deleting subtree with path prefix: ${path}`); // Debug log to verify path
     return this.deleteMany({
       path: {
         $regex: `^${NodeRepository.escapeRegex(path)}`,
